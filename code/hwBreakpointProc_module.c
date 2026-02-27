@@ -23,31 +23,32 @@ static cvector g_hwbp_handle_info_arr = NULL;
 
 static void record_hit_details(struct HWBP_HANDLE_INFO *info, struct pt_regs *regs) {
     struct HWBP_HIT_ITEM hit_item = {0};
-	if (!info || !regs) {
-        return;
-    }
-	hit_item.task_id = info->task_id;
+    if (!info || !regs) { return; }
+
+    hit_item.task_id = info->task_id;
     hit_item.hit_addr = regs->pc;
-	hit_item.hit_time = ktime_get_real_seconds();
+    hit_item.hit_time = ktime_get_real_seconds();
+    
+    // 保存通用寄存器
     memcpy(&hit_item.regs_info.regs, regs->regs, sizeof(hit_item.regs_info.regs));
     hit_item.regs_info.sp = regs->sp;
     hit_item.regs_info.pc = regs->pc;
     hit_item.regs_info.pstate = regs->pstate;
     hit_item.regs_info.orig_x0 = regs->orig_x0;
     hit_item.regs_info.syscallno = regs->syscallno;
-	if (system_supports_fpsimd()) {
-        fpsimd_save();       
-        memcpy(&hit_item.regs_info.fp_regs.vregs, 
-               &current->thread.uw.fpsimd_state.vregs, 
-               sizeof(hit_item.regs_info.fp_regs.vregs));  
-        hit_item.regs_info.fp_regs.fpsr = current->thread.uw.fpsimd_state.fpsr;
-        hit_item.regs_info.fp_regs.fpcr = current->thread.uw.fpsimd_state.fpcr;
-    }
+
+    // 保存浮点寄存器 (直接从当前线程的线程信息中读取)
+    // 注意：在断点处理函数中，当前 CPU 的浮点状态通常已经保存到 thread_struct 中
+    hit_item.regs_info.fp_regs.fpsr = current->thread.uw.fpsimd_state.fpsr;
+    hit_item.regs_info.fp_regs.fpcr = current->thread.uw.fpsimd_state.fpcr;
+    memcpy(hit_item.regs_info.fp_regs.vregs, 
+           current->thread.uw.fpsimd_state.vregs, 
+           sizeof(hit_item.regs_info.fp_regs.vregs));
 
     if (info->hit_item_arr) {
-		if(cvector_length(info->hit_item_arr) < MIN_LEN) { // 最多存放MIN_LEN个
-			cvector_pushback(info->hit_item_arr, &hit_item);
-		}
+        if(cvector_length(info->hit_item_arr) < MIN_LEN) {
+            cvector_pushback(info->hit_item_arr, &hit_item);
+        }
     }
 }
 
