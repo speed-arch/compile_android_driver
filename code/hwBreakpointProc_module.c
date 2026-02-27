@@ -35,6 +35,15 @@ static void record_hit_details(struct HWBP_HANDLE_INFO *info, struct pt_regs *re
     hit_item.regs_info.pstate = regs->pstate;
     hit_item.regs_info.orig_x0 = regs->orig_x0;
     hit_item.regs_info.syscallno = regs->syscallno;
+	if (system_supports_fpsimd()) {
+        fpsimd_save();       
+        memcpy(&hit_item.regs_info.fp_regs.vregs, 
+               &current->thread.uw.fpsimd_state.vregs, 
+               sizeof(hit_item.regs_info.fp_regs.vregs));  
+        hit_item.regs_info.fp_regs.fpsr = current->thread.uw.fpsimd_state.fpsr;
+        hit_item.regs_info.fp_regs.fpcr = current->thread.uw.fpsimd_state.fpcr;
+    }
+
     if (info->hit_item_arr) {
 		if(cvector_length(info->hit_item_arr) < MIN_LEN) { // 最多存放MIN_LEN个
 			cvector_pushback(info->hit_item_arr, &hit_item);
@@ -132,7 +141,24 @@ static void hwbp_handler(struct perf_event *bp,
 	mutex_unlock(&g_hwbp_handle_info_mutex);
 }
 
+static ssize_t OnCmdSetProcessFpRegs(struct ioctl_request *hdr, char __user* buf) {
+    struct pid * proc_pid_struct = (struct pid *)hdr->param1; // 传入的进程句柄
+    struct my_fpsimd_state new_fp;
+    struct task_struct *task;
 
+    if (x_copy_from_user(&new_fp, buf, sizeof(struct my_fpsimd_state))) {
+        return -EFAULT;
+    }
+
+    task = pid_task(proc_pid_struct, PIDTYPE_PID);
+    if (!task) return -EINVAL;
+    memcpy(&task->thread.uw.fpsimd_state.vregs, &new_fp.vregs, sizeof(new_fp.vregs));
+    task->thread.uw.fpsimd_state.fpsr = new_fp.fpsr;
+    task->thread.uw.fpsimd_state.fpcr = new_fp.fpcr;
+    set_ti_thread_flag(task_thread_info(task), TIF_FOREIGN_FPSTATE);
+
+    return 0;
+}
 
 static ssize_t OnCmdOpenProcess(struct ioctl_request *hdr, char __user* buf) {
 	uint64_t pid = hdr->param1, handle = 0;
@@ -431,6 +457,8 @@ static inline ssize_t DispatchCommand(struct ioctl_request *hdr, char __user* bu
 		return OnCmdSetHookPc(hdr, buf);
 	case CMD_HIDE_KERNEL_MODULE:
 		return OnCmdHideKernelModule(hdr, buf);
+	case CMD_SET_PROCESS_FP_REGS:
+        return OnCmdSetProcessFpRegs(hdr, buf);
 	default:
 		return -EINVAL;
 	}
