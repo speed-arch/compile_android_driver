@@ -10,6 +10,7 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/compat.h>
+#include <asm/fpsimd.h> // 必须包含此头文件才能访问浮点相关函数和结构
 #include <linux/uaccess.h>
 #include <linux/kernel.h>
 #include <linux/version.h>
@@ -64,30 +65,32 @@ static const struct proc_ops hwBreakpointProc_proc_ops = {
 };
 
 #pragma pack(1)
+// 1. 必须先定义浮点寄存器结构体
 struct my_fpsimd_state {
-    uint64_t vregs[32][2]; 
-    uint32_t fpsr;         
-    uint32_t fpcr;        
-    uint32_t reserved; 
+    uint64_t vregs[32][2]; // 32个128位寄存器
+    uint32_t fpsr;
+    uint32_t fpcr;
+    uint32_t reserved;     // 填充对齐
 };
 
+// 2. 然后修改通用寄存器结构体，加入 fp_regs 成员
 struct my_user_pt_regs {
-	uint64_t regs[31];
-	uint64_t sp;
-	uint64_t pc;
-	uint64_t pstate;
-	uint64_t orig_x0;
-	uint64_t syscallno;
-struct my_fpsimd_state fp_regs;
+    uint64_t regs[31];
+    uint64_t sp;
+    uint64_t pc;
+    uint64_t pstate;
+    uint64_t orig_x0;
+    uint64_t syscallno;
+    struct my_fpsimd_state fp_regs; // <--- 关键：必须添加这一行
 };
 
+// 确保命中项结构体保持一致
 struct HWBP_HIT_ITEM {
-	uint64_t task_id;
-	uint64_t hit_addr;
-	uint64_t hit_time;
-	struct my_user_pt_regs regs_info;
+    uint64_t task_id;
+    uint64_t hit_addr;
+    uint64_t hit_time;
+    struct my_user_pt_regs regs_info;
 };
-
 #pragma pack()
 
 struct HWBP_HANDLE_INFO {
