@@ -21,30 +21,27 @@ static atomic64_t g_hook_pc;
 static struct mutex g_hwbp_handle_info_mutex;
 static cvector g_hwbp_handle_info_arr = NULL;
 
+
 static void record_hit_details(struct HWBP_HANDLE_INFO* info, struct pt_regs* regs) {
-	struct HWBP_HIT_ITEM hit_item = { 0 };
-	if (!info || !regs) { return; }
+    struct HWBP_HIT_ITEM hit_item = { 0 };
+    if (!info || !regs) { return; }
+    hit_item.task_id = info->task_id;
+    hit_item.hit_addr = regs->pc;
+    hit_item.hit_time = ktime_get_real_seconds();
+    memcpy(&hit_item.regs_info.regs, regs->regs, sizeof(hit_item.regs_info.regs));
+    hit_item.regs_info.sp = regs->sp;
+    hit_item.regs_info.pc = regs->pc;
+    hit_item.regs_info.pstate = regs->pstate;
+    if (current && current->mm) {
 
-	hit_item.task_id = info->task_id;
-	hit_item.hit_addr = regs->pc;
-	hit_item.hit_time = ktime_get_real_seconds();
-
-	memcpy(&hit_item.regs_info.regs, regs->regs, sizeof(hit_item.regs_info.regs));
-	hit_item.regs_info.sp = regs->sp;
-	hit_item.regs_info.pc = regs->pc;
-	hit_item.regs_info.pstate = regs->pstate;
-	hit_item.regs_info.orig_x0 = regs->orig_x0;
-	hit_item.regs_info.syscallno = regs->syscallno;
-	struct fpsimd_state* fp = &current->thread.uw.fpsimd_state;
-	memcpy(&hit_item.regs_info.fp_regs.vregs, fp->vregs, sizeof(fp->vregs));
-	hit_item.regs_info.fp_regs.fpsr = fp->fpsr;
-	hit_item.regs_info.fp_regs.fpcr = fp->fpcr;
-
-	if (info->hit_item_arr) {
-		if (cvector_length(info->hit_item_arr) < MIN_LEN) {
-			cvector_pushback(info->hit_item_arr, &hit_item);
-		}
-	}
+        struct fpsimd_state *fp = &current->thread.uw.fpsimd_state;
+        memcpy(hit_item.regs_info.fp_regs.vregs, fp->vregs, sizeof(fp->vregs));
+        hit_item.regs_info.fp_regs.fpsr = fp->fpsr;
+        hit_item.regs_info.fp_regs.fpcr = fp->fpcr;
+    }    
+	
+    cvector_pushback(info->hit_item_arr, &hit_item);
+    info->hit_total_count++;
 }
 #ifdef CONFIG_MODIFY_HIT_NEXT_MODE
 static bool arm64_move_bp_to_next_instruction(struct perf_event *bp, uint64_t next_instruction_addr, struct perf_event_attr *original_attr, struct perf_event_attr * next_instruction_attr) {
