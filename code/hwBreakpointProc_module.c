@@ -161,6 +161,21 @@ static ssize_t OnCmdSetProcessFpRegs(struct ioctl_request *hdr, char __user* buf
     return 0;
 }
 
+static ssize_t OnCmdGetProcessFpRegs(struct ioctl_request *hdr, char __user* buf) {
+    struct pid * proc_pid_struct = (struct pid *)hdr->param1;
+    struct my_fpsimd_state fp;
+    struct task_struct *task = pid_task(proc_pid_struct, PIDTYPE_PID);
+    if (!task) return -EINVAL;
+
+    memcpy(&fp.vregs, &task->thread.uw.fpsimd_state.vregs, sizeof(fp.vregs));
+    fp.fpsr = task->thread.uw.fpsimd_state.fpsr;
+    fp.fpcr = task->thread.uw.fpsimd_state.fpcr;
+    fp.reserved = 0;
+
+    if (x_copy_to_user(buf, &fp, sizeof(fp))) return -EFAULT;
+    return 0;
+}
+
 static ssize_t OnCmdOpenProcess(struct ioctl_request *hdr, char __user* buf) {
 	uint64_t pid = hdr->param1, handle = 0;
 	struct pid * proc_pid_struct = NULL;
@@ -460,6 +475,8 @@ static inline ssize_t DispatchCommand(struct ioctl_request *hdr, char __user* bu
 		return OnCmdHideKernelModule(hdr, buf);
 	case CMD_SET_PROCESS_FP_REGS:
         return OnCmdSetProcessFpRegs(hdr, buf);
+	case CMD_GET_PROCESS_FP_REGS:
+        return OnCmdGetProcessFpRegs(hdr, buf);
 	default:
 		return -EINVAL;
 	}
