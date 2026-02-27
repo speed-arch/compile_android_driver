@@ -43,6 +43,8 @@ enum {
 	CMD_GET_HWBP_HIT_DETAIL,		// 获取硬件断点命中详细信息
 	CMD_SET_HOOK_PC,				// 设置无条件Hook跳转
 	CMD_HIDE_KERNEL_MODULE,			// 隐藏驱动
+	CMD_GET_PROCESS_FP_REGS = 12,   // 获取浮点寄存器
+    CMD_SET_PROCESS_FP_REGS = 13,   // 设置浮点寄存器
 };
 
 struct hwBreakpointProcDev {
@@ -62,6 +64,13 @@ static const struct proc_ops hwBreakpointProc_proc_ops = {
 };
 
 #pragma pack(1)
+struct my_fpsimd_state {
+    uint64_t vregs[32][2]; 
+    uint32_t fpsr;         
+    uint32_t fpcr;        
+    uint32_t reserved; 
+};
+
 struct my_user_pt_regs {
 	uint64_t regs[31];
 	uint64_t sp;
@@ -69,13 +78,16 @@ struct my_user_pt_regs {
 	uint64_t pstate;
 	uint64_t orig_x0;
 	uint64_t syscallno;
+struct my_fpsimd_state fp_regs;
 };
+
 struct HWBP_HIT_ITEM {
 	uint64_t task_id;
 	uint64_t hit_addr;
 	uint64_t hit_time;
 	struct my_user_pt_regs regs_info;
 };
+
 #pragma pack()
 
 struct HWBP_HANDLE_INFO {
