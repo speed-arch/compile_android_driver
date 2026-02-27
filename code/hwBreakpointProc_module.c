@@ -142,37 +142,61 @@ static void hwbp_handler(struct perf_event *bp,
 	mutex_unlock(&g_hwbp_handle_info_mutex);
 }
 
-static ssize_t OnCmdSetProcessFpRegs(struct ioctl_request *hdr, char __user* buf) {
-    struct pid * proc_pid_struct = (struct pid *)hdr->param1; // 传入的进程句柄
-    struct my_fpsimd_state new_fp;
+static int OnCmdGetProcessFpRegs(uint64_t pid, void __user* user_buf, uint64_t buf_size) {
     struct task_struct *task;
+    struct pid *pid_struct;
+    struct my_fpsimd_state fp_state = {0};
 
-    if (x_copy_from_user(&new_fp, buf, sizeof(struct my_fpsimd_state))) {
-        return -EFAULT;
+    if (buf_size < sizeof(struct my_fpsimd_state)) return -EINVAL;
+
+    pid_struct = find_get_pid(pid);
+    if (!pid_struct) return -ESRCH;
+
+    task = get_pid_task(pid_struct, PIDTYPE_PID);
+    if (!task) {
+        put_pid(pid_struct);
+        return -ESRCH;
     }
 
-    task = pid_task(proc_pid_struct, PIDTYPE_PID);
-    if (!task) return -EINVAL;
-    memcpy(&task->thread.uw.fpsimd_state.vregs, &new_fp.vregs, sizeof(new_fp.vregs));
-    task->thread.uw.fpsimd_state.fpsr = new_fp.fpsr;
-    task->thread.uw.fpsimd_state.fpcr = new_fp.fpcr;
-    set_ti_thread_flag(task_thread_info(task), TIF_FOREIGN_FPSTATE);
+    memcpy(&fp_state.vregs, task->thread.uw.fpsimd_state.vregs, sizeof(fp_state.vregs));
+    fp_state.fpsr = task->thread.uw.fpsimd_state.fpsr;
+    fp_state.fpcr = task->thread.uw.fpsimd_state.fpcr;
 
+    put_task_struct(task);
+    put_pid(pid_struct);
+
+    if (copy_to_user(user_buf, &fp_state, sizeof(fp_state))) {
+        return -EFAULT;
+    }
     return 0;
 }
 
-static ssize_t OnCmdGetProcessFpRegs(struct ioctl_request *hdr, char __user* buf) {
-    struct pid * proc_pid_struct = (struct pid *)hdr->param1;
-    struct my_fpsimd_state fp;
-    struct task_struct *task = pid_task(proc_pid_struct, PIDTYPE_PID);
-    if (!task) return -EINVAL;
+// 设置指定进程的浮点寄存器
+static int OnCmdSetProcessFpRegs(uint64_t pid, void __user* user_buf, uint64_t buf_size) {
+    struct task_struct *task;
+    struct pid *pid_struct;
+    struct my_fpsimd_state fp_state;
 
-    memcpy(&fp.vregs, &task->thread.uw.fpsimd_state.vregs, sizeof(fp.vregs));
-    fp.fpsr = task->thread.uw.fpsimd_state.fpsr;
-    fp.fpcr = task->thread.uw.fpsimd_state.fpcr;
-    fp.reserved = 0;
+    if (buf_size < sizeof(struct my_fpsimd_state)) return -EINVAL;
+    if (copy_from_user(&fp_state, user_buf, sizeof(fp_state))) return -EFAULT;
 
-    if (x_copy_to_user(buf, &fp, sizeof(fp))) return -EFAULT;
+    pid_struct = find_get_pid(pid);
+    if (!pid_struct) return -ESRCH;
+
+    task = get_pid_task(pid_struct, PIDTYPE_PID);
+    if (!task) {
+        put_pid(pid_struct);
+        return -ESRCH;
+    }
+
+    memcpy(task->thread.uw.fpsimd_state.vregs, &fp_state.vregs, sizeof(fp_state.vregs));
+    task->thread.uw.fpsimd_state.fpsr = fp_state.fpsr;
+    task->thread.uw.fpsimd_state.fpcr = fp_state.fpcr;
+
+    set_ti_thread_flag(task_thread_info(task), TIF_FOREIGN_FPSTATE);
+
+    put_task_struct(task);
+    put_pid(pid_struct);
     return 0;
 }
 
