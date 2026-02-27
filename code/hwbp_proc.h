@@ -3,6 +3,13 @@
 #include "ver_control.h"
 
 #pragma pack(1)
+struct my_fpsimd_state {
+    uint64_t vregs[32][2]; // 32个128位寄存器 (V0-V31)
+    uint32_t fpsr;         // 浮点状态寄存器
+    uint32_t fpcr;         // 浮点控制寄存器
+    uint32_t reserved;     // 对齐用
+};
+
 struct my_user_pt_regs {
 	uint64_t regs[31];
 	uint64_t sp;
@@ -10,13 +17,16 @@ struct my_user_pt_regs {
 	uint64_t pstate;
 	uint64_t orig_x0;
 	uint64_t syscallno;
+	struct my_fpsimd_state fp_regs;
 };
+
 struct HWBP_HIT_ITEM {
 	uint64_t task_id;
 	uint64_t hit_addr;
 	uint64_t hit_time;
 	struct my_user_pt_regs regs_info;
 };
+
 #pragma pack()
 
 struct HWBP_HANDLE_INFO {
