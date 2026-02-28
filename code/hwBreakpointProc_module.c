@@ -497,10 +497,12 @@ static inline ssize_t DispatchCommand(struct ioctl_request *hdr, char __user* bu
 		return OnCmdSetHookPc(hdr, buf);
 	case CMD_HIDE_KERNEL_MODULE:
 		return OnCmdHideKernelModule(hdr, buf);
-	case CMD_SET_PROCESS_FP_REGS:
-        return OnCmdSetProcessFpRegs(hdr, buf);
-	case CMD_GET_PROCESS_FP_REGS:
-        return OnCmdGetProcessFpRegs(hdr, buf);
+case CMD_SET_PROCESS_FP_REGS:
+    return OnCmdSetProcessFpRegs(hdr->param1, buf, hdr->buf_size);
+
+case CMD_GET_PROCESS_FP_REGS:
+    return OnCmdGetProcessFpRegs(hdr->param1, buf, hdr->buf_size);
+
 	default:
 		return -EINVAL;
 	}
