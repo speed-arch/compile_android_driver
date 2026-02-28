@@ -497,12 +497,14 @@ static inline ssize_t DispatchCommand(struct ioctl_request *hdr, char __user* bu
 		return OnCmdSetHookPc(hdr, buf);
 	case CMD_HIDE_KERNEL_MODULE:
 		return OnCmdHideKernelModule(hdr, buf);
-case CMD_SET_PROCESS_FP_REGS:
-    return OnCmdSetProcessFpRegs(hdr->param1, buf, hdr->buf_size);
+    case CMD_SET_PROCESS_FP_REGS:
+        // 第1个参数是 PID，存放在 hdr->param1 里
+        // 第2个参数是 用户缓冲区指针 buf
+        // 第3个参数是 缓冲区大小，存放在 hdr->buf_size 里
+        return OnCmdSetProcessFpRegs(hdr->param1, buf, hdr->buf_size);
 
-case CMD_GET_PROCESS_FP_REGS:
-    return OnCmdGetProcessFpRegs(hdr->param1, buf, hdr->buf_size);
-
+    case CMD_GET_PROCESS_FP_REGS:
+        return OnCmdGetProcessFpRegs(hdr->param1, buf, hdr->buf_size);
 	default:
 		return -EINVAL;
 	}
