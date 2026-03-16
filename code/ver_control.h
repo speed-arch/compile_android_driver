@@ -10,7 +10,7 @@
 #define CONFIG_PROC_NODE_AUTH_KEY "x7k9p2m4q6r1"
 
 // 打印内核调试信息
-//#define CONFIG_DEBUG_PRINTK
+#define CONFIG_DEBUG_PRINTK
 
 #ifndef KERNEL_VERSION
 #define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
