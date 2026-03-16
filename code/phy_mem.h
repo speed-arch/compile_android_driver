@@ -144,14 +144,18 @@ static inline int is_pte_can_exec(pte_t* pte) {
 	return 0;
 }
 static inline int change_pte_read_status(pte_t* pte, bool can_read) {
-      if (!pte) return 0;
-      if (can_read) {
-          set_pte(pte, pte_mkread(*pte));
-      } else {
-          set_pte(pte, pte_rdprotect(*pte));
-      }
-      return 1;
-  }
+    if (!pte) { return 0; }
+    
+#if defined(CONFIG_ARM64) || defined(__aarch64__)
+    if (can_read) {
+        set_pte(pte, pte_mkread(*pte));
+    } else {
+        set_pte(pte, pte_rdprotect(*pte));
+    }
+#endif
+
+    return 1;
+}
 static inline int change_pte_write_status(pte_t* pte, bool can_write) {
 	if (!pte) { return 0; }
 	if (can_write) {
